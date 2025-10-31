@@ -9,18 +9,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+    <!-- NEW: Leaflet.markercluster plugin -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Leaflet Providers (for different basemaps) -->
     <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
-
-    <!-- Leaflet.measure plugin - REMOVED -->
-    <!-- <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css"> -->
-    <!-- <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script> -->
-
-    <!-- html2canvas (for screenshot) - REMOVED -->
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script> -->
 
     <!-- Inter Font -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -111,7 +109,8 @@
             display: flex;
             align-items: center;
             margin-bottom: 4px;
-            justify-content: center; /* Centered items */
+            justify-content: left; /* Changed from center */
+            font-size: 12px;
         }
         .legend-color-box {
             width: 16px;
@@ -119,13 +118,7 @@
             margin-right: 8px;
             border-radius: 4px;
             border: 1px solid #555;
-        }
-        .legend-frp-circle {
-            /* This class is now a bit of a misnomer, but it's used for styling the FRP size icons */
-            background: #db6a2c;
-            /* border-radius: 50%; */ /* Removed, shape is set by SVG */
-            margin-right: 8px;
-            border: 1px solid rgba(0,0,0,0.3);
+            flex-shrink: 0; /* Prevent shrinking */
         }
 
         /* Custom DivIcon class for markers */
@@ -134,90 +127,127 @@
             border: none !important;
         }
 
-        /* Disclaimer control - REMOVED */
-        /*
-        .leaflet-control-disclaimer {
-            font-size: 11px;
+        /* Marker Cluster Customization */
+        .marker-cluster-small {
+            background-color: rgba(241, 128, 23, 0.6);
         }
-        */
+        .marker-cluster-small div {
+            background-color: rgba(240, 128, 23, 0.8);
+        }
+        .marker-cluster-medium {
+            background-color: rgba(240, 59, 32, 0.6);
+        }
+        .marker-cluster-medium div {
+            background-color: rgba(240, 59, 32, 0.8);
+        }
+        .marker-cluster-large {
+            background-color: rgba(200, 32, 32, 0.6);
+        }
+        .marker-cluster-large div {
+            background-color: rgba(200, 32, 32, 0.8);
+        }
+        .marker-cluster div {
+            width: 30px;
+            height: 30px;
+            margin-left: 5px;
+            margin-top: 5px;
+            text-align: center;
+            border-radius: 15px;
+            font: 12px "Inter", sans-serif;
+            color: #fff;
+        }
+        .marker-cluster span {
+            line-height: 30px;
+        }
+
     </style>
 </head>
 <body class="bg-gray-100">
 
     <!-- Control Panel -->
-    <div id="control-panel" class="absolute top-0 left-0 h-screen w-80 bg-white shadow-lg z-20 p-4 transform -translate-x-full sm:translate-x-0 transition-transform duration-300 ease-in-out">
-        <div class="flex flex-col h-full">
-            <h1 class="text-2xl font-bold text-gray-800 mb-4">Active Fire Map</h1>
-            
-            <!-- Scrollable Content Area -->
-            <div id="control-panel-content" class="flex-grow overflow-y-auto pr-2">
-                
-                <!-- Time Interval -->
-                <div class="mb-4">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-2">Time Interval</h2>
-                    <!-- Changed to 5 columns and adjusted padding (px-2) to fit -->
-                    <div class="grid grid-cols-5 gap-2 mb-3">
-                        <button id="btn-6h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 6h</button>
-                        <button id="btn-12h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 12h</button>
-                        <button id="btn-24h" class="time-btn px-2 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">Last 24h</button>
-                        <!-- NEW BUTTONS -->
-                        <button id="btn-48h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 48h</button>
-                        <button id="btn-72h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 72h</button>
-                    </div>
-                </div>
-
-                <!-- Custom Date Range -->
-                <div class="mb-4">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-2">Custom Date Range</h2>
-                    <div class="space-y-2">
-                        <div>
-                            <label for="start-time" class="block text-xs font-medium text-gray-600">Start</label>
-                            <input type="datetime-local" id="start-time" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label for="end-time" class="block text-xs font-medium text-gray-600">End</label>
-                            <input type="datetime-local" id="end-time" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <button id="btn-custom-filter" class="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Apply Custom</button>
-                    </div>
-                </div>
-
-                <!-- Satellite Selection -->
-                <div class="mb-4 border-t pt-4 mt-4">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-3">Satellites</h2>
-                    <div id="satellite-filter-list" class="space-y-2">
-                        <!-- This will be populated dynamically by JavaScript -->
-                        <p class="text-sm text-gray-500">Loading data...</p>
-                    </div>
-                </div>
-
-                <!-- Fire Type Selection -->
-                <div class="mb-4 border-t pt-4 mt-4">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-3">Fire Type</h2>
-                    <div id="fire-type-filter-list" class="space-y-2">
-                         <p class="text-sm text-gray-500">Loading...</p>
-                    </div>
-                </div>
-                
-                <!-- Tools -->
-                <div class="mb-3 border-t pt-4 mt-4">
-                    <h2 class="text-sm font-semibold text-gray-700 mb-3">Tools</h2>
-                    <div class="space-y-2">
-                        <button id="btn-copy-link" class="w-full px-4 py-2 text-sm text-left font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            Copy Shareable Link
-                        </button>
-                        <!-- NEW 'About' button -->
-                        <button id="btn-about" class="w-full px-4 py-2 text-sm text-left font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            About & Disclaimer
-                        </button>
-                        <!-- Capture button REMOVED -->
-                        <!-- <button id="btn-screenshot" ... </button> -->
-                    </div>
-                </div>
-
-            </div>
+    <div id="control-panel" class="absolute top-0 left-0 h-screen w-80 bg-white shadow-lg z-20 p-4 transform -translate-x-full sm:translate-x-0 transition-transform duration-300 ease-in-out flex flex-col">
+        
+        <div class="flex-shrink-0">
+             <h1 class="text-2xl font-bold text-gray-800 mb-4">Active Fire Map</h1>
         </div>
-    </div>
+        
+        <!-- Scrollable Content Area -->
+        <div id="control-panel-content" class="flex-grow overflow-y-auto pr-2">
+            
+            <!-- Time Interval -->
+            <div class="mb-4">
+                <h2 class="text-sm font-semibold text-gray-700 mb-2">Time Interval</h2>
+                <!-- Changed to 5 columns and adjusted padding (px-2) to fit -->
+                <div class="grid grid-cols-5 gap-2 mb-3">
+                    <button id="btn-6h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 6h</button>
+                    <button id="btn-12h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 12h</button>
+                    <button id="btn-24h" class="time-btn px-2 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">Last 24h</button>
+                    <!-- NEW BUTTONS -->
+                    <button id="btn-48h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 48h</button>
+                    <button id="btn-72h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 72h</button>
+                </div>
+            </div>
+
+            <!-- Custom Date Range -->
+            <div class="mb-4">
+                <h2 class="text-sm font-semibold text-gray-700 mb-2">Custom Date Range</h2>
+                <div class="space-y-2">
+                    <div>
+                        <label for="start-time" class="block text-xs font-medium text-gray-600">Start</label>
+                        <input type="datetime-local" id="start-time" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="end-time" class="block text-xs font-medium text-gray-600">End</label>
+                        <input type="datetime-local" id="end-time" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button id="btn-custom-filter" class="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Apply Custom</button>
+                </div>
+            </div>
+
+            <!-- Satellite Selection -->
+            <div class="mb-4 border-t pt-4 mt-4">
+                <h2 class="text-sm font-semibold text-gray-700 mb-3">Satellites</h2>
+                <div id="satellite-filter-list" class="space-y-2">
+                    <!-- This will be populated dynamically by JavaScript -->
+                    <p class="text-sm text-gray-500">Loading data...</p>
+                </div>
+            </div>
+
+            <!-- Fire Type Selection -->
+            <div class="mb-4 border-t pt-4 mt-4">
+                <h2 class="text-sm font-semibold text-gray-700 mb-3">Fire Type</h2>
+                <div id="fire-type-filter-list" class="space-y-2">
+                     <p class="text-sm text-gray-500">Loading...</p>
+                </div>
+            </div>
+            
+            <!-- Tools -->
+            <div class="mb-3 border-t pt-4 mt-4">
+                <h2 class="text-sm font-semibold text-gray-700 mb-3">Tools</h2>
+                <div class="space-y-2">
+                    <button id="btn-copy-link" class="w-full px-4 py-2 text-sm text-left font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Copy Shareable Link
+                    </button>
+                    <!-- 'About' button -->
+                    <button id="btn-about" class="w-full px-4 py-2 text-sm text-left font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        About & Disclaimer
+                    </button>
+                </div>
+            </div>
+
+        </div> <!-- End Scrollable Content -->
+        
+        <!-- NEW: Lab Banner (pinned to bottom) -->
+        <div class="flex-shrink-0 border-t pt-3 mt-3">
+             <a href="https://ici.web.uniroma1.it/it/eosial-earth-observation-satellite-images-applications-lab" target="_blank" rel="noopener noreferrer" title="Visit our lab website">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/0/0d/Uniroma1.svg" 
+                     alt="EOSIAL Website"
+                     class="w-full rounded-md transition-opacity hover:opacity-80">
+            </a>
+            <p class="text-xs text-gray-500 text-center mt-2">Earth Observation Satellite Image Applications Laboratory <br> School of Aerospace Engineering <br> Sapienza Univerisity</p>
+        </div>
+
+    </div> <!-- End Control Panel -->
 
     <!-- Panel Toggle Button -->
     <button id="toggle-panel-btn" class="absolute top-1/2 -translate-y-1/2 left-0 sm:left-80 z-20 p-2 bg-white text-gray-600 rounded-r-md shadow-lg transition-transform duration-300 ease-in-out">
@@ -255,12 +285,16 @@
 
     <script>
         // --- CONFIGURATION ---
+        
+        // REMOVED satelliteConfig
+        /*
         const satelliteConfig = {
             'MTG-1':   { color: '#e60000' }, // Bright Red
             'VIIRS':   { color: '#ff8c00' }, // Dark Orange
             'MODIS':   { color: '#ffc107' }, // Amber
             'DEFAULT': { color: '#808080' }  // Gray
         };
+        */
 
         const fireTypeConfig = {
             // SVG paths for a 24x24 viewbox. Will be scaled by 'size'.
@@ -271,11 +305,19 @@
             3: { label: 'Offshore', path: 'M12 2L22 12 12 22 2 12 12 2z' } // Diamond
         };
 
+        // NEW: FRP Color Scale (based on common FIRMS/VIIRS scales)
+        const frpColorConfig = [
+            { frp: 50, color: '#FFFF00' },   // Yellow
+            { frp: 250, color: '#FFA500' },  // Orange
+            { frp: 1000, color: '#FF0000' }, // Red
+            { frp: Infinity, color: '#800080' } // Purple (for very high values)
+        ];
+
         const MAX_CUSTOM_DAYS = 31; // Max 1 month custom range
 
         // --- GLOBAL VARIABLES ---
         let map;
-        let fireDataLayer = null;
+        let markerClusterGroup; // CHANGED: Replaces fireDataLayer
         let allLoadedFeatures = [];
         let isYearFileLoaded = false;
         let legendControl;
@@ -320,6 +362,16 @@
 
             // Add scale bar
             L.control.scale({ position: 'bottomleft' }).addTo(map);
+
+            // NEW: Initialize marker cluster group
+            markerClusterGroup = L.markerClusterGroup({
+                chunkedLoading: true,
+                maxClusterRadius: 60,
+                spiderfyOnMaxZoom: true, // This is the magic for overlapping points
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true
+            });
+            map.addLayer(markerClusterGroup); // Add the group to the map once
 
             // Add legend
             addLegend();
@@ -509,22 +561,22 @@
             const container = document.getElementById('satellite-filter-list');
             container.innerHTML = ''; // Clear existing
             
-            const satellites = new Set(allLoadedFeatures.map(f => f.properties.SATELLITE));
+            const satellites = [...new Set(allLoadedFeatures.map(f => f.properties.SATELLITE))].sort();
             
-            if (satellites.size === 0) {
+            if (satellites.length === 0) {
                  container.innerHTML = '<p class="text-sm text-gray-500">No satellites to display.</p>';
                  return;
             }
             
             for (const sat of satellites) {
-                const config = satelliteConfig[sat] || satelliteConfig['DEFAULT'];
+                // const config = satelliteConfig[sat] || satelliteConfig['DEFAULT']; // Color logic removed
                 const div = document.createElement('div');
                 div.className = 'flex items-center';
                 
                 div.innerHTML = `
                     <input id="sat-${sat}" type="checkbox" value="${sat}" class="satellite-filter h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
                     <label for="sat-${sat}" class="ml-3 flex items-center text-sm text-gray-700">
-                        <span class="w-4 h-4 rounded-full mr-2" style="background-color: ${config.color}; border: 1px solid #555;"></span>
+                        <!-- Color swatch removed -->
                         ${sat}
                     </label>
                 `;
@@ -659,36 +711,38 @@
         }
 
         function displayFireData(features) {
-            if (fireDataLayer) {
-                map.removeLayer(fireDataLayer);
-            }
+            // CHANGED: Clear the cluster group, not a layer
+            markerClusterGroup.clearLayers();
             
             if (features.length === 0) {
                 console.log("No features to display after filtering.");
                 return;
             }
 
-            fireDataLayer = L.geoJSON(features, {
+            // CHANGED: Create a GeoJSON layer to add to the cluster group
+            const geoJSONLayer = L.geoJSON(features, {
                 pointToLayer: (feature, latlng) => {
                     const props = feature.properties;
-                    const satConfig = satelliteConfig[props.SATELLITE] || satelliteConfig['DEFAULT'];
+                    // const satConfig = satelliteConfig[props.SATELLITE] || satelliteConfig['DEFAULT']; // REMOVED
                     const typeConfig = fireTypeConfig[props.TYPE] || fireTypeConfig[0]; // Default to circle
                     
-                    // Scale radius based on FRP (Fire Radiative Power)
+                    // NEW: Get color from FRP, not satellite
                     const frp = props.FRP_WOOSTER || 0; // Use FRP_WOOSTER
-                    const radius = getFRPLinearRadius(frp);
-                    const size = radius * 2; // diameter
+                    const frpColor = getFRPColor(frp);
+                    
+                    // NEW: Fixed size for all icons. Size scaling is removed.
+                    const iconSize = 12; // Base diameter
 
                     const iconHtml = `
-                        <svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.8; stroke: #000; stroke-width: 1.5; fill: ${satConfig.color};">
+                        <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.8; stroke: #000; stroke-width: 1.5; fill: ${frpColor};">
                             <path d="${typeConfig.path}" />
                         </svg>`;
 
                     const icon = L.divIcon({
                         html: iconHtml,
                         className: 'fire-marker-icon', // Custom class
-                        iconSize: [size, size],
-                        iconAnchor: [radius, radius] // Center the icon
+                        iconSize: [iconSize, iconSize],
+                        iconAnchor: [iconSize / 2, iconSize / 2] // Center the icon
                     });
 
                     return L.marker(latlng, { icon: icon });
@@ -700,32 +754,35 @@
                 }
             });
             
-            fireDataLayer.addTo(map);
+            // CHANGED: Add the GeoJSON layer to the marker cluster group
+            markerClusterGroup.addLayer(geoJSONLayer);
         }
 
-        function getFRPLinearRadius(frp) {
-            // Linear scale: 5px base, +1px per 50 FRP, max 20px
-            if (frp < 10) return 5;
-            if (frp < 50) return 6;
-            if (frp < 100) return 8;
-            if (frp < 250) return 10;
-            if (frp < 500) return 12;
-            if (frp < 1000) return 15;
-            return 20;
+        // REMOVED: getFRPLinearRadius function
+
+        // NEW: Get color based on FRP value
+        function getFRPColor(frp) {
+            for (const level of frpColorConfig) {
+                if (frp < level.frp) {
+                    return level.color;
+                }
+            }
+            return frpColorConfig[frpColorConfig.length - 1].color; // Default to last color
         }
 
         /**
          * Creates the HTML content for a feature's popup
          */
         function createPopupContent(props) {
-            const satConfig = satelliteConfig[props.SATELLITE] || satelliteConfig['DEFAULT'];
+            // const satConfig = satelliteConfig[props.SATELLITE] || satelliteConfig['DEFAULT']; // REMOVED
             const typeConfig = fireTypeConfig[props.TYPE] || fireTypeConfig[0];
             
             // Format date/time
             const date = parseFeatureDate(props);
             const displayDate = date ? date.toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC' : 'N/A';
             
-            let content = `<h3 style="color: ${satConfig.color};">${props.SATELLITE} Hotspot</h3>`;
+            // CHANGED: Removed color from h3
+            let content = `<h3>${props.SATELLITE} Hotspot</h3>`;
             content += '<table>';
             
             // Add high-priority fields first
@@ -765,7 +822,7 @@
             legendControl.onAdd = function (map) {
                 const div = L.DomUtil.create('div', 'legend');
                 
-                // --- New Fire Type Section ---
+                // --- Fire Type Section (Unchanged) ---
                 let typeHtml = `<div class="legend-section"><h4 class="text-center">Fire Type</h4>`;
                 const iconSize = 14; // Size for legend icons
                 for (const type in fireTypeConfig) {
@@ -781,28 +838,19 @@
                 }
                 typeHtml += '</div>';
                 
-                // FRP section
+                // --- FRP section (CHANGED to show color, not size) ---
                 let frpHtml = `
                     <div class="legend-section" style="border-top: 1px solid #ccc; padding-top: 8px;">
                         <h4 id="frp-title-btn" class="cursor-pointer hover:underline" title="Click for info">Fire Radiative Power [MW]</h4>
                     </div>
                 `;
-                const frpLevels = [
-                    { frp: '< 10', size: getFRPLinearRadius(5) },
-                    { frp: '< 50', size: getFRPLinearRadius(40) },
-                    { frp: '< 250', size: getFRPLinearRadius(200) },
-                    { frp: '> 1000', size: getFRPLinearRadius(1001) }
-                ];
-                frpLevels.forEach(level => {
-                    const size = level.size * 2;
-                    // Using a circle for the FRP legend as it's the simplest shape to scale
-                    frpHtml += `
-                        <div class="legend-item">
-                            <span class="legend-frp-circle" style="width: ${size}px; height: ${size}px; border-radius: 50%; margin-right: 8px;"></span>
-                            <span>${level.frp}</span>
-                        </div>
-                    `;
-                });
+                
+                // Add legend items from the new frpColorConfig
+                frpHtml += `<div class="legend-item"><span class="legend-color-box" style="background-color: ${frpColorConfig[0].color};"></span> &lt; 50</div>`;
+                frpHtml += `<div class="legend-item"><span class="legend-color-box" style="background-color: ${frpColorConfig[1].color};"></span> &lt; 250</div>`;
+                frpHtml += `<div class="legend-item"><span class="legend-color-box" style="background-color: ${frpColorConfig[2].color};"></span> &lt; 1000</div>`;
+                frpHtml += `<div class="legend-item"><span class="legend-color-box" style="background-color: ${frpColorConfig[3].color};"></span> &ge; 1000</div>`;
+                
                 frpHtml += '</div>';
 
                 div.innerHTML = typeHtml + frpHtml; // Add both sections
@@ -854,8 +902,7 @@
                     <p class="font-semibold">More Information:</p>
                     <p>For more details on the fire detection algorithm, please see the following publications:</p>
                     <ul class="list-disc list-inside ml-2">
-                        <li><a href="#" class="text-blue-600 hover:underline">Di Biase, Laneve. "Geostationary sensor based forest fire detection and monitoring: An improved version of the SFIDE algorithm." Remote Sensing 10, no. 5 (2018): 741.
-</a>https://www.mdpi.com/2072-4292/10/5/741</li>
+                        <li><a href="#" class="text-blue-600 hover:underline">[Placeholder for Publication Link 1]</a></li>
                         <li><a href="#" class="text-blue-600 hover:underline">[Placeholder for Publication Link 2]</a></li>
                     </ul>
                 </div>
@@ -875,7 +922,7 @@
                 <div class="space-y-3 text-sm">
                     <p><strong>Fire Radiative Power (FRP)</strong> is a measure of the radiant energy released per unit of time by a fire, measured in Megawatts (MW).</p>
                     <p>It is a key indicator of fire intensity and is calculated from satellite sensor data by measuring the difference in brightness temperature at specific infrared wavelengths.</p>
-                    <p>In this map, the <strong>size of each shape</strong> is proportional to the FRP (from FRP_WOOSTER) value, providing a visual guide to the fire's intensity.</p>
+                    <p>In this map, the <strong>color of each shape</strong> is proportional to the FRP (from FRP_WOOSTER) value, providing a visual guide to the fire's intensity.</p>
                 </div>
             `;
             // Show OK button instead of Close
@@ -908,12 +955,8 @@
             document.body.removeChild(tempInput);
         }
 
-        /* captureMapImage function REMOVED */
-        // async function captureMapImage() { ... }
-
     </script>
 
 </body>
 </html>
-
 
