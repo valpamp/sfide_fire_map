@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Active Fire Map</title>
+    
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Leaflet Providers (for different basemaps) -->
+    <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
+
+    <!-- Leaflet.measure plugin - REMOVED -->
+    <!-- <link rel="stylesheet" href="https://unpkg.com/leaflet-measure/dist/leaflet-measure.css"> -->
+    <!-- <script src="https://unpkg.com/leaflet-measure/dist/leaflet-measure.js"></script> -->
+
+    <!-- html2canvas (for screenshot) - REMOVED -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script> -->
+
+    <!-- Inter Font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+        }
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 10;
+        }
+        /* Custom scrollbar for the panel */
+        #control-panel-content {
+            scrollbar-width: thin;
+            scrollbar-color: #9ca3af #e5e7eb;
+        }
+        #control-panel-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        #control-panel-content::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 4px;
+        }
+        #control-panel-content::-webkit-scrollbar-thumb {
+            background: #9ca3af;
+            border-radius: 4px;
+        }
+        #control-panel-content::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+
+        /* Popup Table */
+        .leaflet-popup-content {
+            font-size: 13px;
+            width: 320px !important;
+        }
+        .leaflet-popup-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 4px;
+        }
+        .leaflet-popup-content table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .leaflet-popup-content th {
+            text-align: left;
+            padding: 4px 8px 4px 0;
+            font-weight: 500;
+            color: #374151;
+            vertical-align: top;
+            width: 100px;
+        }
+        .leaflet-popup-content td {
+            text-align: left;
+            padding: 4px 0;
+            color: #1f293d;
+        }
+        .leaflet-popup-content tr:nth-child(even) {
+            background-color: #f9fafb;
+        }
+
+        /* Legend */
+        .legend {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(5px);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            line-height: 1.4;
+            width: 170px; /* Widened slightly */
+        }
+        .legend h4 {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 14px;
+            text-align: center; /* Centered title */
+        }
+        .legend-section {
+            margin-bottom: 8px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            justify-content: center; /* Centered items */
+        }
+        .legend-color-box {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            border-radius: 4px;
+            border: 1px solid #555;
+        }
+        .legend-frp-circle {
+            /* This class is now a bit of a misnomer, but it's used for styling the FRP size icons */
+            background: #db6a2c;
+            /* border-radius: 50%; */ /* Removed, shape is set by SVG */
+            margin-right: 8px;
+            border: 1px solid rgba(0,0,0,0.3);
+        }
+
+        /* Custom DivIcon class for markers */
+        .fire-marker-icon {
+            background: none !important;
+            border: none !important;
+        }
+
+        /* Disclaimer control - REMOVED */
+        /*
+        .leaflet-control-disclaimer {
+            font-size: 11px;
+        }
+        */
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Control Panel -->
+    <div id="control-panel" class="absolute top-0 left-0 h-screen w-80 bg-white shadow-lg z-20 p-4 transform -translate-x-full sm:translate-x-0 transition-transform duration-300 ease-in-out">
+        <div class="flex flex-col h-full">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">Active Fire Map</h1>
+            
+            <!-- Scrollable Content Area -->
+            <div id="control-panel-content" class="flex-grow overflow-y-auto pr-2">
+                
+                <!-- Time Interval -->
+                <div class="mb-4">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-2">Time Interval</h2>
+                    <!-- Changed to 5 columns and adjusted padding (px-2) to fit -->
+                    <div class="grid grid-cols-5 gap-2 mb-3">
+                        <button id="btn-6h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 6h</button>
+                        <button id="btn-12h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 12h</button>
+                        <button id="btn-24h" class="time-btn px-2 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200">Last 24h</button>
+                        <!-- NEW BUTTONS -->
+                        <button id="btn-48h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 48h</button>
+                        <button id="btn-72h" class="time-btn px-2 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">Last 72h</button>
+                    </div>
+                </div>
+
+                <!-- Custom Date Range -->
+                <div class="mb-4">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-2">Custom Date Range</h2>
+                    <div class="space-y-2">
+                        <div>
+                            <label for="start-time" class="block text-xs font-medium text-gray-600">Start</label>
+                            <input type="datetime-local" id="start-time" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label for="end-time" class="block text-xs font-medium text-gray-600">End</label>
+                            <input type="datetime-local" id="end-time" class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <button id="btn-custom-filter" class="w-full px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Apply Custom</button>
+                    </div>
+                </div>
+
+                <!-- Satellite Selection -->
+                <div class="mb-4 border-t pt-4 mt-4">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-3">Satellites</h2>
+                    <div id="satellite-filter-list" class="space-y-2">
+                        <!-- This will be populated dynamically by JavaScript -->
+                        <p class="text-sm text-gray-500">Loading data...</p>
+                    </div>
+                </div>
+
+                <!-- Fire Type Selection -->
+                <div class="mb-4 border-t pt-4 mt-4">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-3">Fire Type</h2>
+                    <div id="fire-type-filter-list" class="space-y-2">
+                         <p class="text-sm text-gray-500">Loading...</p>
+                    </div>
+                </div>
+                
+                <!-- Tools -->
+                <div class="mb-3 border-t pt-4 mt-4">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-3">Tools</h2>
+                    <div class="space-y-2">
+                        <button id="btn-copy-link" class="w-full px-4 py-2 text-sm text-left font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Copy Shareable Link
+                        </button>
+                        <!-- NEW 'About' button -->
+                        <button id="btn-about" class="w-full px-4 py-2 text-sm text-left font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            About & Disclaimer
+                        </button>
+                        <!-- Capture button REMOVED -->
+                        <!-- <button id="btn-screenshot" ... </button> -->
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Toggle Button -->
+    <button id="toggle-panel-btn" class="absolute top-1/2 -translate-y-1/2 left-0 sm:left-80 z-20 p-2 bg-white text-gray-600 rounded-r-md shadow-lg transition-transform duration-300 ease-in-out">
+        <svg id="toggle-panel-icon" class="w-5 h-5 transition-transform duration-300 ease-in-out" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+    </button>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Modal Message Box -->
+    <div id="message-box" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-sm w-full">
+            <div class="p-4 border-b">
+                <h3 id="message-title" class="text-lg font-medium text-gray-900">Message</h3>
+            </div>
+            <div id="message-text" class="p-4 text-sm text-gray-700 leading-relaxed">
+                <!-- Message content goes here -->
+            </div>
+            <div class="bg-gray-50 p-4 flex justify-end space-x-2">
+                <button id="message-close-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none">Close</button>
+                <button id="message-ok-btn" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700 focus:outline-none">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="hidden fixed inset-0 bg-white bg-opacity-70 flex items-center justify-center z-50">
+        <svg class="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const satelliteConfig = {
+            'MTG-1':   { color: '#e60000' }, // Bright Red
+            'VIIRS':   { color: '#ff8c00' }, // Dark Orange
+            'MODIS':   { color: '#ffc107' }, // Amber
+            'DEFAULT': { color: '#808080' }  // Gray
+        };
+
+        const fireTypeConfig = {
+            // SVG paths for a 24x24 viewbox. Will be scaled by 'size'.
+            // Using "M" to move, "L" to draw line, "H" horizontal, "V" vertical, "Z" close path
+            0: { label: 'Vegetation Fire', path: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z' }, // Circle
+            1: { label: 'Active Volcano', path: 'M12 2L2 22h20L12 2z' }, // Triangle
+            2: { label: 'Static Land Source', path: 'M3 3h18v18H3V3z' }, // Square
+            3: { label: 'Offshore', path: 'M12 2L22 12 12 22 2 12 12 2z' } // Diamond
+        };
+
+        const MAX_CUSTOM_DAYS = 31; // Max 1 month custom range
+
+        // --- GLOBAL VARIABLES ---
+        let map;
+        let fireDataLayer = null;
+        let allLoadedFeatures = [];
+        let isYearFileLoaded = false;
+        let legendControl;
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            initMap();
+            setupUIListeners();
+            populateFireTypeFilters(); // Populate static fire types
+            loadInitialData();
+        };
+
+        function initMap() {
+            map = L.map('map', {
+                center: [41.9, 12.5], // Center of Italy
+                zoom: 6,
+                zoomControl: false // Disable default zoom, will add it back
+            });
+
+            // Add zoom control to top-right
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // --- Basemaps ---
+            const baseLayers = {
+                'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }),
+                'Google Hybrid': L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}',{
+                    maxZoom: 20,
+                    subdomains:['mt0','mt1','mt2','mt3'],
+                    attribution: '&copy; Google Maps'
+                }),
+                'TopoMap': L.tileLayer.provider('OpenTopoMap'),
+                'Dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 20
+                })
+            };
+            baseLayers['Google Hybrid'].addTo(map); // Default
+            L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
+
+            // Add scale bar
+            L.control.scale({ position: 'bottomleft' }).addTo(map);
+
+            // Add legend
+            addLegend();
+        }
+
+        function setupUIListeners() {
+            // Time interval buttons
+            const timeBtns = document.querySelectorAll('.time-btn');
+            timeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    // Update styles
+                    timeBtns.forEach(b => b.classList.remove('bg-blue-100', 'text-blue-700', 'bg-blue-600', 'text-white'));
+                    timeBtns.forEach(b => b.classList.add('bg-gray-100', 'text-gray-700'));
+                    btn.classList.remove('bg-gray-100', 'text-gray-700');
+                    btn.classList.add('bg-blue-600', 'text-white');
+                    
+                    // Clear custom inputs
+                    document.getElementById('start-time').value = '';
+                    document.getElementById('end-time').value = '';
+
+                    // Get hours
+                    const hours = parseInt(btn.id.replace('btn-', '').replace('h', ''));
+                    const endDate = new Date(); // Use real current time
+                    const startDate = new Date(endDate.getTime() - (hours * 60 * 60 * 1000));
+                    
+                    filterAndDisplayData(startDate, endDate);
+                });
+            });
+
+            // Custom filter button
+            document.getElementById('btn-custom-filter').addEventListener('click', () => {
+                const startDateVal = document.getElementById('start-time').value;
+                const endDateVal = document.getElementById('end-time').value;
+
+                if (!startDateVal || !endDateVal) {
+                    showMessage("Input Error", "Please select both a start and end date.");
+                    return;
+                }
+                
+                const startDate = new Date(startDateVal);
+                const endDate = new Date(endDateVal);
+
+                if (startDate > endDate) {
+                    showMessage("Input Error", "Start date must be before the end date.");
+                    return;
+                }
+
+                // Check date range limit
+                const diffDays = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+                if (diffDays > MAX_CUSTOM_DAYS) {
+                    showMessage("Input Error", `The maximum custom time range is ${MAX_CUSTOM_DAYS} days.`);
+                    return;
+                }
+                
+                // Clear active time button styles
+                timeBtns.forEach(b => b.classList.remove('bg-blue-100', 'text-blue-700', 'bg-blue-600', 'text-white'));
+                timeBtns.forEach(b => b.classList.add('bg-gray-100', 'text-gray-700'));
+
+                filterAndDisplayData(startDate, endDate);
+            });
+            
+            // Modal close buttons
+            document.getElementById('message-close-btn').addEventListener('click', hideMessage);
+            document.getElementById('message-ok-btn').addEventListener('click', hideMessage);
+
+            // Tool buttons
+            document.getElementById('btn-copy-link').addEventListener('click', copyLinkToClipboard);
+            document.getElementById('btn-about').addEventListener('click', showAboutModal);
+
+            // Panel toggle
+            const toggleBtn = document.getElementById('toggle-panel-btn');
+            const panel = document.getElementById('control-panel');
+            const icon = document.getElementById('toggle-panel-icon');
+            
+            toggleBtn.addEventListener('click', () => {
+                if (panel.classList.contains('-translate-x-full')) {
+                    // Show panel
+                    panel.classList.remove('-translate-x-full');
+                    toggleBtn.classList.remove('left-0');
+                    toggleBtn.classList.add('left-80'); // w-80 = 20rem = 320px
+                    icon.classList.add('rotate-180');
+                } else {
+                    // Hide panel
+                    panel.classList.add('-translate-x-full');
+                    toggleBtn.classList.remove('left-80');
+                    toggleBtn.classList.add('left-0');
+                    icon.classList.remove('rotate-180');
+                }
+            });
+
+            // Set initial state for toggle button on small screens
+            if (window.innerWidth < 640) { // 640px = sm:
+                panel.classList.add('-translate-x-full');
+                toggleBtn.classList.remove('sm:left-80');
+                toggleBtn.classList.add('left-0');
+            } else {
+                panel.classList.remove('-translate-x-full');
+                toggleBtn.classList.remove('left-0');
+                toggleBtn.classList.add('sm:left-80'); // Use sm: prefix to match CSS
+                icon.classList.add('rotate-180');
+            }
+        }
+
+        // --- DATA LOADING ---
+
+        function loadInitialData() {
+            showLoading();
+            
+            // Fetch the 72h file
+            console.log("Attempting to fetch './sfide_aggregate_72h.geojson'");
+            
+            fetch('./sfide_aggregate_72h.geojson')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(geojson => {
+                    if (!geojson.features || geojson.features.length === 0) {
+                        // NEW LOGIC: 72h file is empty, fall back to year file.
+                        console.warn("72h file is empty or missing features. Attempting to load year file...");
+                        // Pass null dates to loadYearDataAndFilter.
+                        // It will load the year file, then call filterAndDisplayData(null, null),
+                        // which will trigger the default 24h filter.
+                        loadYearDataAndFilter(null, null);
+                    } else {
+                        // 72h file is good
+                        allLoadedFeatures = geojson.features;
+                        console.log(`Loaded ${allLoadedFeatures.length} features from 72h file.`);
+                        populateSatelliteFilters();
+                        // Trigger the default "24h" filter
+                        document.getElementById('btn-24h').click();
+                        hideLoading();
+                    }
+                })
+                .catch(err => {
+                    // NEW LOGIC: Also fall back to year file on fetch error
+                    console.error("Failed to load initial fire data:", err);
+                    console.warn("Attempting to load year file as a fallback...");
+                    loadYearDataAndFilter(null, null);
+                });
+        }
+        
+        function loadYearDataAndFilter(startDate, endDate) {
+            showLoading();
+            const currentYear = new Date().getFullYear();
+            const yearFileName = `./sfide_aggregate_${currentYear}.geojson`;
+            console.log(`Date range requires year file. Attempting to fetch: ${yearFileName}`);
+
+            fetch(yearFileName)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(geojson => {
+                    if (!geojson.features) {
+                        console.warn("Year GeoJSON file loaded, but no 'features' array found.");
+                        allLoadedFeatures = [];
+                    } else {
+                        allLoadedFeatures = geojson.features;
+                        console.log(`Loaded ${allLoadedFeatures.length} features from year file.`);
+                    }
+                    isYearFileLoaded = true;
+                    populateSatelliteFilters(); // Re-populate satellite list with all data
+                    
+                    // Now that the data is loaded, re-run the filter.
+                    // If startDate/endDate are null (from the new fallback),
+                    // filterAndDisplayData will use the default 24h filter.
+                    filterAndDisplayData(startDate, endDate);
+                })
+                .catch(err => {
+                    console.error("Failed to load year fire data:", err);
+                    hideLoading();
+                    showMessage("Data Load Error", `Could not load '${yearFileName}'. \n\nPlease ensure the file exists and the server is running. \n\nFalling back to 72-hour data.`);
+                    // Re-filter with existing data as a fallback (which might be empty, but it's the last resort)
+                    filterAndDisplayData(startDate, endDate);
+                });
+        }
+
+
+        // --- DATA FILTERING AND DISPLAY ---
+
+        function populateSatelliteFilters() {
+            const container = document.getElementById('satellite-filter-list');
+            container.innerHTML = ''; // Clear existing
+            
+            const satellites = new Set(allLoadedFeatures.map(f => f.properties.SATELLITE));
+            
+            if (satellites.size === 0) {
+                 container.innerHTML = '<p class="text-sm text-gray-500">No satellites to display.</p>';
+                 return;
+            }
+            
+            for (const sat of satellites) {
+                const config = satelliteConfig[sat] || satelliteConfig['DEFAULT'];
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                
+                div.innerHTML = `
+                    <input id="sat-${sat}" type="checkbox" value="${sat}" class="satellite-filter h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                    <label for="sat-${sat}" class="ml-3 flex items-center text-sm text-gray-700">
+                        <span class="w-4 h-4 rounded-full mr-2" style="background-color: ${config.color}; border: 1px solid #555;"></span>
+                        ${sat}
+                    </label>
+                `;
+                container.appendChild(div);
+            }
+            
+            // Add event listeners to new checkboxes
+            document.querySelectorAll('.satellite-filter').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    filterAndDisplayData(null, null); // Re-filter with current time
+                });
+            });
+        }
+
+        function populateFireTypeFilters() {
+            const container = document.getElementById('fire-type-filter-list');
+            container.innerHTML = ''; // Clear existing
+            
+            const iconSize = 14;
+            
+            for (const type in fireTypeConfig) {
+                const config = fireTypeConfig[type];
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                
+                div.innerHTML = `
+                    <input id="type-${type}" type="checkbox" value="${type}" class="fire-type-filter h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
+                    <label for="type-${type}" class="ml-3 flex items-center text-sm text-gray-700">
+                        <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="fill: #777; stroke: #000; stroke-width: 2; margin-right: 8px;">
+                            <path d="${config.path}" />
+                        </svg>
+                        ${config.label}
+                    </label>
+                `;
+                container.appendChild(div);
+            }
+            
+            // Add event listeners to new checkboxes
+            document.querySelectorAll('.fire-type-filter').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    filterAndDisplayData(null, null); // Re-filter with current time
+                });
+            });
+        }
+        
+        function filterAndDisplayData(startDate, endDate) {
+            showLoading();
+            
+            // Use new local variables 'effectiveStartDate' and 'effectiveEndDate'
+            let effectiveStartDate = startDate;
+            let effectiveEndDate = endDate;
+
+            // If no dates are passed, get them from the active filter
+            if (!effectiveStartDate || !effectiveEndDate) {
+                const startDateVal = document.getElementById('start-time').value;
+                const endDateVal = document.getElementById('end-time').value;
+
+                if (startDateVal && endDateVal) {
+                    effectiveStartDate = new Date(startDateVal);
+                    effectiveEndDate = new Date(endDateVal);
+                } else {
+                    // Fallback to the active button
+                    const activeBtn = document.querySelector('.time-btn.bg-blue-600') || document.getElementById('btn-24h');
+                    const hours = parseInt(activeBtn.id.replace('btn-', '').replace('h', ''));
+                    effectiveEndDate = new Date(); // Use real current time
+                    effectiveStartDate = new Date(effectiveEndDate.getTime() - (hours * 60 * 60 * 1000));
+                }
+            }
+
+            // Check if we need to load the year file
+            const hours72ago = new Date(new Date().getTime() - (72 * 60 * 60 * 1000));
+            if (effectiveStartDate < hours72ago && !isYearFileLoaded) {
+                // The requested start date is older than 72 hours, and we haven't loaded the year file yet.
+                // We must load the year file first, which will then re-call this filter function.
+                loadYearDataAndFilter(effectiveStartDate, effectiveEndDate);
+                return; // Stop current execution
+            }
+
+            // If we're here, we have the correct data (72h or Year) in allLoadedFeatures
+
+            // Get active satellites
+            const activeSatellites = Array.from(document.querySelectorAll('.satellite-filter:checked'))
+                                          .map(cb => cb.value);
+            
+            // Get active fire types
+            const activeFireTypes = Array.from(document.querySelectorAll('.fire-type-filter:checked'))
+                                          .map(cb => parseInt(cb.value)); // Parse to int
+            
+            // Filter features
+            const filteredFeatures = allLoadedFeatures.filter(feature => {
+                const props = feature.properties;
+                
+                // 1. Filter by satellite
+                if (!activeSatellites.includes(props.SATELLITE)) {
+                    return false;
+                }
+
+                // 2. Filter by fire type
+                // Use props.TYPE (number) and compare to activeFireTypes (array of numbers)
+                if (!activeFireTypes.includes(props.TYPE)) {
+                    return false;
+                }
+                
+                // 3. Filter by date
+                const date = parseFeatureDate(props);
+                if (!date) {
+                    return false;
+                }
+                return date >= effectiveStartDate && date <= effectiveEndDate;
+            });
+
+            // Display on map
+            displayFireData(filteredFeatures);
+            hideLoading();
+        }
+
+        function parseFeatureDate(props) {
+            try {
+                // DATETIME: "202506021220"
+                const dtStr = props.DATETIME;
+                const year = parseInt(dtStr.substring(0, 4));
+                const month = parseInt(dtStr.substring(4, 6)) - 1; // JS months are 0-11
+                const day = parseInt(dtStr.substring(6, 8));
+                const hour = parseInt(dtStr.substring(8, 10));
+                const minute = parseInt(dtStr.substring(10, 12));
+                // Assume UTC
+                return new Date(Date.UTC(year, month, day, hour, minute));
+            } catch (e) {
+                console.warn("Error parsing date for feature:", props);
+                return null;
+            }
+        }
+
+        function displayFireData(features) {
+            if (fireDataLayer) {
+                map.removeLayer(fireDataLayer);
+            }
+            
+            if (features.length === 0) {
+                console.log("No features to display after filtering.");
+                return;
+            }
+
+            fireDataLayer = L.geoJSON(features, {
+                pointToLayer: (feature, latlng) => {
+                    const props = feature.properties;
+                    const satConfig = satelliteConfig[props.SATELLITE] || satelliteConfig['DEFAULT'];
+                    const typeConfig = fireTypeConfig[props.TYPE] || fireTypeConfig[0]; // Default to circle
+                    
+                    // Scale radius based on FRP (Fire Radiative Power)
+                    const frp = props.FRP_WOOSTER || 0; // Use FRP_WOOSTER
+                    const radius = getFRPLinearRadius(frp);
+                    const size = radius * 2; // diameter
+
+                    const iconHtml = `
+                        <svg width="${size}" height="${size}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.8; stroke: #000; stroke-width: 1.5; fill: ${satConfig.color};">
+                            <path d="${typeConfig.path}" />
+                        </svg>`;
+
+                    const icon = L.divIcon({
+                        html: iconHtml,
+                        className: 'fire-marker-icon', // Custom class
+                        iconSize: [size, size],
+                        iconAnchor: [radius, radius] // Center the icon
+                    });
+
+                    return L.marker(latlng, { icon: icon });
+                },
+                onEachFeature: (feature, layer) => {
+                    layer.bindPopup(createPopupContent(feature.properties), { 
+                        maxWidth: 350
+                    });
+                }
+            });
+            
+            fireDataLayer.addTo(map);
+        }
+
+        function getFRPLinearRadius(frp) {
+            // Linear scale: 5px base, +1px per 50 FRP, max 20px
+            if (frp < 10) return 5;
+            if (frp < 50) return 6;
+            if (frp < 100) return 8;
+            if (frp < 250) return 10;
+            if (frp < 500) return 12;
+            if (frp < 1000) return 15;
+            return 20;
+        }
+
+        /**
+         * Creates the HTML content for a feature's popup
+         */
+        function createPopupContent(props) {
+            const satConfig = satelliteConfig[props.SATELLITE] || satelliteConfig['DEFAULT'];
+            const typeConfig = fireTypeConfig[props.TYPE] || fireTypeConfig[0];
+            
+            // Format date/time
+            const date = parseFeatureDate(props);
+            const displayDate = date ? date.toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC' : 'N/A';
+            
+            let content = `<h3 style="color: ${satConfig.color};">${props.SATELLITE} Hotspot</h3>`;
+            content += '<table>';
+            
+            // Add high-priority fields first
+            content += `<tr><th>Time</th><td>${displayDate}</td></tr>`;
+            content += `<tr><th>FRP (Wooster)</th><td>${props.FRP_WOOSTER || 'N/A'} MW</td></tr>`;
+            content += `<tr><th>Fire Type</th><td>${typeConfig.label} (${props.TYPE})</td></tr>`;
+            content += `<tr><th>Confidence</th><td>${props.CONFIDENCE || 'N/A'}%</td></tr>`;
+            content += `<tr><th>Lat/Lon</th><td>${props.LATITUDE.toFixed(4)}, ${props.LONGITUDE.toFixed(4)}</td></tr>`;
+            content += `<tr><th>Day/Night</th><td>${props.DAYNIGHT === 'D' ? 'Day' : 'Night'}</td></tr>`;
+
+            // Add all other fields dynamically
+            const skipKeys = [
+                'LATITUDE', 'LONGITUDE', 'ACQ_DATE', 'ACQ_TIME', 'DATETIME', 
+                'SATELLITE', 'FRP_WOOSTER', 'FRP_MODIS', 'CONFIDENCE', 'DAYNIGHT', 'TYPE'
+            ];
+            
+            for (const key in props) {
+                if (props.hasOwnProperty(key) && !skipKeys.includes(key)) {
+                    // Try to round numbers
+                    let value = props[key];
+                    if (typeof value === 'number' && !Number.isInteger(value)) {
+                        value = value.toFixed(2);
+                    }
+                    content += `<tr><th>${key}</th><td>${value}</td></tr>`;
+                }
+            }
+            
+            content += '</table>';
+            
+            return content;
+        }
+
+        // --- UI HELPERS ---
+
+        function addLegend() {
+            legendControl = L.control({ position: 'bottomright' });
+            legendControl.onAdd = function (map) {
+                const div = L.DomUtil.create('div', 'legend');
+                
+                // --- New Fire Type Section ---
+                let typeHtml = `<div class="legend-section"><h4 class="text-center">Fire Type</h4>`;
+                const iconSize = 14; // Size for legend icons
+                for (const type in fireTypeConfig) {
+                    const config = fireTypeConfig[type];
+                    typeHtml += `
+                        <div class="legend-item" style="justify-content: left; font-size: 12px;">
+                            <svg width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="fill: #777; stroke: #000; stroke-width: 2; margin-right: 8px; flex-shrink: 0;">
+                                <path d="${config.path}" />
+                            </svg>
+                            <span>${config.label}</span>
+                        </div>
+                    `;
+                }
+                typeHtml += '</div>';
+                
+                // FRP section
+                let frpHtml = `
+                    <div class="legend-section" style="border-top: 1px solid #ccc; padding-top: 8px;">
+                        <h4 id="frp-title-btn" class="cursor-pointer hover:underline" title="Click for info">Fire Radiative Power [MW]</h4>
+                    </div>
+                `;
+                const frpLevels = [
+                    { frp: '< 10', size: getFRPLinearRadius(5) },
+                    { frp: '< 50', size: getFRPLinearRadius(40) },
+                    { frp: '< 250', size: getFRPLinearRadius(200) },
+                    { frp: '> 1000', size: getFRPLinearRadius(1001) }
+                ];
+                frpLevels.forEach(level => {
+                    const size = level.size * 2;
+                    // Using a circle for the FRP legend as it's the simplest shape to scale
+                    frpHtml += `
+                        <div class="legend-item">
+                            <span class="legend-frp-circle" style="width: ${size}px; height: ${size}px; border-radius: 50%; margin-right: 8px;"></span>
+                            <span>${level.frp}</span>
+                        </div>
+                    `;
+                });
+                frpHtml += '</div>';
+
+                div.innerHTML = typeHtml + frpHtml; // Add both sections
+                
+                // Add click listener for the new FRP title
+                const frpTitle = div.querySelector('#frp-title-btn');
+                L.DomEvent.on(frpTitle, 'click', (e) => {
+                    L.DomEvent.stop(e); // Stop map click
+                    showFrpInfo();
+                });
+
+                return div;
+            };
+            legendControl.addTo(map);
+        }
+
+        function showLoading() {
+            document.getElementById('loading-spinner').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-spinner').classList.add('hidden');
+        }
+
+        function showMessage(title, text) {
+            document.getElementById('message-title').innerText = title;
+            document.getElementById('message-text').innerHTML = text.replace(/\n/g, '<br>'); // Use innerHTML to allow line breaks
+            
+            // Hide OK button unless it's the about modal
+            document.getElementById('message-ok-btn').classList.add('hidden');
+            document.getElementById('message-close-btn').classList.remove('hidden');
+
+            document.getElementById('message-box').classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            document.getElementById('message-box').classList.add('hidden');
+        }
+
+        function showAboutModal() {
+            const title = "About & Disclaimer";
+            const text = `
+                <div class="space-y-3 text-sm">
+                    <p>This webGIS displays active fire detections based on satellite imagery.</p>
+                    
+                    <p class="font-semibold">Disclaimer:</p>
+                    <p>The data provided here is "as is" with no guarantee of accuracy or completeness. It is intended for informational purposes only and should not be used for emergency response decisions.</p>
+                    
+                    <p class="font-semibold">More Information:</p>
+                    <p>For more details on the fire detection algorithm, please see the following publications:</p>
+                    <ul class="list-disc list-inside ml-2">
+                        <li><a href="#" class="text-blue-600 hover:underline">Di Biase, Laneve. "Geostationary sensor based forest fire detection and monitoring: An improved version of the SFIDE algorithm." Remote Sensing 10, no. 5 (2018): 741.
+</a>https://www.mdpi.com/2072-4292/10/5/741</li>
+                        <li><a href="#" class="text-blue-600 hover:underline">[Placeholder for Publication Link 2]</a></li>
+                    </ul>
+                </div>
+            `;
+            // Show OK button instead of Close
+            document.getElementById('message-ok-btn').classList.remove('hidden');
+            document.getElementById('message-close-btn').classList.add('hidden');
+            
+            document.getElementById('message-title').innerText = title;
+            document.getElementById('message-text').innerHTML = text;
+            document.getElementById('message-box').classList.remove('hidden');
+        }
+
+        function showFrpInfo() {
+            const title = "Fire Radiative Power (FRP)";
+            const text = `
+                <div class="space-y-3 text-sm">
+                    <p><strong>Fire Radiative Power (FRP)</strong> is a measure of the radiant energy released per unit of time by a fire, measured in Megawatts (MW).</p>
+                    <p>It is a key indicator of fire intensity and is calculated from satellite sensor data by measuring the difference in brightness temperature at specific infrared wavelengths.</p>
+                    <p>In this map, the <strong>size of each shape</strong> is proportional to the FRP (from FRP_WOOSTER) value, providing a visual guide to the fire's intensity.</p>
+                </div>
+            `;
+            // Show OK button instead of Close
+            document.getElementById('message-ok-btn').classList.remove('hidden');
+            document.getElementById('message-close-btn').classList.add('hidden');
+            
+            document.getElementById('message-title').innerText = title;
+            document.getElementById('message-text').innerHTML = text;
+            document.getElementById('message-box').classList.remove('hidden');
+        }
+
+        function copyLinkToClipboard() {
+            const url = window.location.href;
+            const tempInput = document.createElement('input');
+            tempInput.style.position = 'absolute';
+            tempInput.style.left = '-9999px';
+            tempInput.value = url;
+            
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                showMessage("Link Copied", "The current URL has been copied to your clipboard.");
+            } catch (err) {
+                console.error('Failed to copy link: ', err);
+                showMessage("Copy Failed", "Could not copy the link to your clipboard.");
+            }
+            
+            document.body.removeChild(tempInput);
+        }
+
+        /* captureMapImage function REMOVED */
+        // async function captureMapImage() { ... }
+
+    </script>
+
+</body>
+</html>
+
+
